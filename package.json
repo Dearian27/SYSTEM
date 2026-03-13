@@ -1,0 +1,27 @@
+{
+  "name": "system",
+  "version": "1.0.0",
+  "description": "task tracking",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "tsc -p tsconfig.json",
+    "parse:sessions": "tsx -r tsconfig-paths/register scripts/parseDailySessions.ts",
+    "build:ticket-spent": "tsx -r tsconfig-paths/register scripts/buildTicketSpent.ts",
+    "build:ticket-stats": "tsx -r tsconfig-paths/register scripts/buildTicketStats.ts",
+    "build:sprint-summary": "tsx -r tsconfig-paths/register scripts/buildCurrentSprintSummary.ts",
+    "build:dashboard": "tsx -r tsconfig-paths/register scripts/buildDashboard.ts",
+    "build:all": "npm run parse:sessions && npm run build:ticket-spent && npm run build:ticket-stats && npm run build:sprint-summary && npm run build:dashboard"
+  },
+  "author": "Dearian",
+  "license": "ISC",
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsconfig-paths": "^4.2.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "gray-matter": "^4.0.3"
+  }
+}
