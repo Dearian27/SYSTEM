@@ -67,6 +67,18 @@ ${renderStatusTable(summary.ticketsByStatus)}
 ${renderAreaTable(summary.effortByArea)}
 
 ---
+
+## Burndown
+
+![[burndown.svg]]
+
+---
+
+## Burndown Excalidraw
+
+![[burndown.excalidraw.md]]
+
+---
 `;
 }
 

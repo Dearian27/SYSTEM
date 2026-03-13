@@ -5,6 +5,9 @@ export const PATHS = {
   dashboardDir: path.resolve("../Dashboard"),
   dashboardFile: path.resolve("../Dashboard/Sprint-dashboard.md"),
   burndownDashboardFile: path.resolve("../Dashboard/Burndown.md"),
+  burndownSvgFile: path.resolve("../Dashboard/burndown.svg"),
+  excalidrawDir: path.resolve("../Dashboard"),
+  burndownExcalidrawFile: path.resolve("../Dashboard/burndown.excalidraw.md"),
 
   dailyDir: path.resolve("../Daily Reports"),
   ticketsDir: path.resolve("../Tickets"),

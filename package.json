@@ -13,7 +13,9 @@
     "build:dashboard": "tsx -r tsconfig-paths/register scripts/buildDashboard.ts",
     "build:burndown": "tsx -r tsconfig-paths/register scripts/buildBurndown.ts",
     "sync:spent": "tsx -r tsconfig-paths/register scripts/syncSpentToTickets.ts",
-    "build:all": "npm run parse:sessions && npm run build:ticket-spent && npm run build:ticket-stats && npm run build:sprint-summary && npm run build:dashboard && npm run build:burndown && npm run sync:spent"
+    "build:burndown-svg": "tsx -r tsconfig-paths/register scripts/buildBurndownSvg.ts",
+    "build:burndown-excalidraw": "tsx -r tsconfig-paths/register scripts/buildBurndownExcalidraw.ts",
+    "build:all": "npm run parse:sessions && npm run build:ticket-spent && npm run build:ticket-stats && npm run build:sprint-summary && npm run build:dashboard && npm run build:burndown && npm run build:burndown-excalidraw && npm run sync:spent"
   },
   "author": "Dearian",
   "license": "ISC",
