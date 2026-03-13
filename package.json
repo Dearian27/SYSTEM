@@ -11,7 +11,9 @@
     "build:ticket-stats": "tsx -r tsconfig-paths/register scripts/buildTicketStats.ts",
     "build:sprint-summary": "tsx -r tsconfig-paths/register scripts/buildCurrentSprintSummary.ts",
     "build:dashboard": "tsx -r tsconfig-paths/register scripts/buildDashboard.ts",
-    "build:all": "npm run parse:sessions && npm run build:ticket-spent && npm run build:ticket-stats && npm run build:sprint-summary && npm run build:dashboard"
+    "build:burndown": "tsx -r tsconfig-paths/register scripts/buildBurndown.ts",
+    "sync:spent": "tsx -r tsconfig-paths/register scripts/syncSpentToTickets.ts",
+    "build:all": "npm run parse:sessions && npm run build:ticket-spent && npm run build:ticket-stats && npm run build:sprint-summary && npm run build:dashboard && npm run build:burndown && npm run sync:spent"
   },
   "author": "Dearian",
   "license": "ISC",

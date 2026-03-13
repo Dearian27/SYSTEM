@@ -7,3 +7,4 @@ export type {
   TicketSpentMap,
   TicketStats,
 } from "./ticket";
+export type { BurndownData, BurndownPoint } from "./burndown";

@@ -4,6 +4,7 @@ export const PATHS = {
   //? UI related paths
   dashboardDir: path.resolve("../Dashboard"),
   dashboardFile: path.resolve("../Dashboard/Sprint-dashboard.md"),
+  burndownDashboardFile: path.resolve("../Dashboard/Burndown.md"),
 
   dailyDir: path.resolve("../Daily Reports"),
   ticketsDir: path.resolve("../Tickets"),
@@ -16,6 +17,7 @@ export const PATHS = {
   ticketSpentFile: path.resolve(".generated/ticket-spent.json"),
   ticketStatsFile: path.resolve(".generated/ticket-stats.json"),
   sprintSummaryFile: path.resolve(".generated/sprint-summary.json"),
+  burndownFile: path.resolve(".generated/burndown-data.json"),
 };
 
 export const HEADINGS = {
