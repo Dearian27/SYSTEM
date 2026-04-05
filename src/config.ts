@@ -1,27 +1,36 @@
 import path from "node:path";
 
-export const PATHS = {
-  //? UI related paths
-  dashboardDir: path.resolve("../Dashboard"),
-  dashboardFile: path.resolve("../Dashboard/Sprint-dashboard.md"),
-  burndownDashboardFile: path.resolve("../Dashboard/Burndown.md"),
-  burndownSvgFile: path.resolve("../Dashboard/burndown.svg"),
-  excalidrawDir: path.resolve("../Dashboard"),
-  burndownExcalidrawFile: path.resolve("../Dashboard/burndown.excalidraw.md"),
+function buildPaths(engineRoot: string) {
+  return {
+    dashboardDir: path.resolve(engineRoot, "../Dashboard"),
+    dashboardFile: path.resolve(engineRoot, "../Dashboard/Sprint-dashboard.md"),
+    burndownDashboardFile: path.resolve(engineRoot, "../Dashboard/Burndown.md"),
+    burndownSvgFile: path.resolve(engineRoot, "../Dashboard/burndown.svg"),
+    excalidrawDir: path.resolve(engineRoot, "../Dashboard"),
+    burndownExcalidrawFile: path.resolve(
+      engineRoot,
+      "../Dashboard/burndown.excalidraw.md"
+    ),
+    dailyDir: path.resolve(engineRoot, "../Daily Reports"),
+    ticketsDir: path.resolve(engineRoot, "../Tickets"),
+    sprintsDir: path.resolve(engineRoot, "../Sprints"),
+    generatedDir: path.resolve(engineRoot, ".generated"),
+    sessionsFile: path.resolve(engineRoot, ".generated/sessions.json"),
+    ticketSpentFile: path.resolve(engineRoot, ".generated/ticket-spent.json"),
+    ticketStatsFile: path.resolve(engineRoot, ".generated/ticket-stats.json"),
+    sprintSummaryFile: path.resolve(
+      engineRoot,
+      ".generated/sprint-summary.json"
+    ),
+    burndownFile: path.resolve(engineRoot, ".generated/burndown-data.json"),
+  };
+}
 
-  dailyDir: path.resolve("../Daily Reports"),
-  ticketsDir: path.resolve("../Tickets"),
-  sprintsDir: path.resolve("../Sprints"),
+export let PATHS = buildPaths(process.cwd());
 
-  //? Code related paths
-  generatedDir: path.resolve(".generated"),
-
-  sessionsFile: path.resolve(".generated/sessions.json"),
-  ticketSpentFile: path.resolve(".generated/ticket-spent.json"),
-  ticketStatsFile: path.resolve(".generated/ticket-stats.json"),
-  sprintSummaryFile: path.resolve(".generated/sprint-summary.json"),
-  burndownFile: path.resolve(".generated/burndown-data.json"),
-};
+export function setEngineRoot(engineRoot: string): void {
+  PATHS = buildPaths(engineRoot);
+}
 
 export const HEADINGS = {
   sessions: "## Sessions",

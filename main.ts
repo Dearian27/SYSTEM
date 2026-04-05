@@ -7,21 +7,15 @@ import {
   Setting,
 } from "obsidian";
 import path from "node:path";
-import { execFile } from "node:child_process";
-import { promisify } from "node:util";
-
-const execFileAsync = promisify(execFile);
+import { setEngineRoot } from "@/config";
+import { runFullAnalyticsPipeline, syncSpentToTickets } from "@/core/analytics";
 
 type SystemEngineSettings = {
   enginePath: string;
-  npmCommand: string;
-  rebuildScripts: string[];
 };
 
 const DEFAULT_SETTINGS: SystemEngineSettings = {
   enginePath: "SYSTEM/.engine",
-  npmCommand: "npm",
-  rebuildScripts: ["build:all", "build:burndown-svg"],
 };
 
 export default class SystemEnginePlugin extends Plugin {
@@ -47,7 +41,7 @@ export default class SystemEnginePlugin extends Plugin {
       id: "sync-spent-only",
       name: "Sync spent to tickets",
       callback: async () => {
-        await this.runScripts(["sync:spent"], "Spent sync completed");
+        await this.runSync();
       },
     });
 
@@ -63,7 +57,6 @@ export default class SystemEnginePlugin extends Plugin {
     this.settings = {
       ...DEFAULT_SETTINGS,
       ...loaded,
-      rebuildScripts: normalizeScriptList(loaded?.rebuildScripts),
     };
   }
 
@@ -90,38 +83,34 @@ export default class SystemEnginePlugin extends Plugin {
   }
 
   async runRebuild(): Promise<void> {
-    await this.runScripts(this.settings.rebuildScripts, "Analytics rebuild completed");
+    await this.runTask("Analytics rebuild completed", async () => {
+      setEngineRoot(this.getEngineAbsolutePath());
+      await runFullAnalyticsPipeline();
+    });
   }
 
-  private async runScripts(
-    scripts: string[],
-    successMessage: string
+  async runSync(): Promise<void> {
+    await this.runTask("Spent sync completed", async () => {
+      setEngineRoot(this.getEngineAbsolutePath());
+      await syncSpentToTickets();
+    });
+  }
+
+  private async runTask(
+    successMessage: string,
+    task: () => Promise<void>
   ): Promise<void> {
     if (this.isRunning) {
       new Notice("SYSTEM Engine is already running.");
       return;
     }
 
-    const normalizedScripts = normalizeScriptList(scripts);
-    if (normalizedScripts.length === 0) {
-      new Notice("No scripts configured for SYSTEM Engine.");
-      return;
-    }
-
     this.isRunning = true;
     this.updateStatusBar("SYSTEM: running...");
-    new Notice(`SYSTEM Engine: running ${normalizedScripts.join(", ")}`);
+    new Notice("SYSTEM Engine: running...");
 
     try {
-      const cwd = this.getEngineAbsolutePath();
-
-      for (const scriptName of normalizedScripts) {
-        this.updateStatusBar(`SYSTEM: ${scriptName}`);
-        await execFileAsync(this.settings.npmCommand, ["run", scriptName], {
-          cwd,
-        });
-      }
-
+      await task();
       this.updateStatusBar("SYSTEM: idle");
       new Notice(successMessage);
     } catch (error) {
@@ -163,37 +152,6 @@ class SystemEngineSettingTab extends PluginSettingTab {
       );
 
     new Setting(containerEl)
-      .setName("NPM command")
-      .setDesc("Command used to run your scripts. Usually npm, pnpm, or yarn.")
-      .addText((text) =>
-        text
-          .setPlaceholder("npm")
-          .setValue(this.plugin.settings.npmCommand)
-          .onChange(async (value) => {
-            this.plugin.settings.npmCommand = value.trim() || DEFAULT_SETTINGS.npmCommand;
-            await this.plugin.saveSettings();
-          })
-      );
-
-    new Setting(containerEl)
-      .setName("Rebuild scripts")
-      .setDesc("One npm script name per line. They will run sequentially.")
-      .addTextArea((text) => {
-        text
-          .setPlaceholder("build:all\nbuild:burndown-svg")
-          .setValue(this.plugin.settings.rebuildScripts.join("\n"))
-          .onChange(async (value) => {
-            this.plugin.settings.rebuildScripts = normalizeScriptList(
-              value.split("\n")
-            );
-            await this.plugin.saveSettings();
-          });
-
-        text.inputEl.rows = 4;
-        text.inputEl.cols = 32;
-      });
-
-    new Setting(containerEl)
       .setName("Run rebuild now")
       .setDesc("Execute the configured analytics rebuild pipeline immediately.")
       .addButton((button) =>
@@ -201,19 +159,16 @@ class SystemEngineSettingTab extends PluginSettingTab {
           await this.plugin.runRebuild();
         })
       );
+
+    new Setting(containerEl)
+      .setName("Sync spent now")
+      .setDesc("Write the latest spent values back into ticket frontmatter.")
+      .addButton((button) =>
+        button.setButtonText("Run").onClick(async () => {
+          await this.plugin.runSync();
+        })
+      );
   }
-}
-
-function normalizeScriptList(value: unknown): string[] {
-  if (!Array.isArray(value)) {
-    return [...DEFAULT_SETTINGS.rebuildScripts];
-  }
-
-  const scripts = value
-    .map((item) => (typeof item === "string" ? item.trim() : ""))
-    .filter(Boolean);
-
-  return scripts.length > 0 ? scripts : [...DEFAULT_SETTINGS.rebuildScripts];
 }
 
 function getErrorMessage(error: unknown): string {
