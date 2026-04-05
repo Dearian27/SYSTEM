@@ -6,6 +6,8 @@
   "type": "module",
   "scripts": {
     "check": "tsc -p tsconfig.json",
+    "dev:plugin": "node esbuild.config.mjs",
+    "build:plugin": "node esbuild.config.mjs production",
     "parse:sessions": "tsx -r tsconfig-paths/register scripts/parseDailySessions.ts",
     "build:ticket-spent": "tsx -r tsconfig-paths/register scripts/buildTicketSpent.ts",
     "build:ticket-stats": "tsx -r tsconfig-paths/register scripts/buildTicketStats.ts",
@@ -20,7 +22,9 @@
   "author": "Dearian",
   "license": "ISC",
   "devDependencies": {
+    "esbuild": "^0.25.10",
     "@types/node": "^25.5.0",
+    "obsidian": "^1.8.10",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3"

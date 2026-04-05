@@ -1,0 +1,9 @@
+{
+  "id": "system-engine",
+  "name": "SYSTEM Engine",
+  "version": "0.0.1",
+  "minAppVersion": "1.5.0",
+  "description": "UI controls for rebuilding and monitoring SYSTEM sprint analytics.",
+  "author": "Dearian",
+  "isDesktopOnly": true
+}
