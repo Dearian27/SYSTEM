@@ -1,7 +1,27 @@
 import esbuild from "esbuild";
+import { copyFile, mkdir } from "node:fs/promises";
 import { builtinModules } from "node:module";
+import path from "node:path";
 
 const prod = process.argv[2] === "production";
+const pluginDir = path.resolve(
+  "../../.obsidian/plugins/system-engine"
+);
+
+const copyStaticFilesPlugin = {
+  name: "copy-static-files",
+  setup(build) {
+    build.onEnd(async (result) => {
+      if (result.errors.length > 0) {
+        return;
+      }
+
+      await mkdir(pluginDir, { recursive: true });
+      await copyFile("manifest.json", path.join(pluginDir, "manifest.json"));
+      await copyFile("versions.json", path.join(pluginDir, "versions.json"));
+    });
+  },
+};
 
 const context = await esbuild.context({
   entryPoints: ["main.ts"],
@@ -17,7 +37,8 @@ const context = await esbuild.context({
   platform: "node",
   sourcemap: prod ? false : "inline",
   logLevel: "info",
-  outfile: "main.js",
+  outfile: path.join(pluginDir, "main.js"),
+  plugins: [copyStaticFilesPlugin],
 });
 
 if (prod) {

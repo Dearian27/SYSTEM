@@ -1,14 +1,18 @@
 import {
   App,
   FileSystemAdapter,
+  ItemView,
   Notice,
   Plugin,
   PluginSettingTab,
   Setting,
+  WorkspaceLeaf,
 } from "obsidian";
 import path from "node:path";
 import { setEngineRoot } from "@/config";
 import { runFullAnalyticsPipeline, syncSpentToTickets } from "@/core/analytics";
+
+const VIEW_TYPE_SYSTEM_ENGINE = "system-engine-view";
 
 type SystemEngineSettings = {
   enginePath: string;
@@ -22,12 +26,18 @@ export default class SystemEnginePlugin extends Plugin {
   settings: SystemEngineSettings = DEFAULT_SETTINGS;
   private statusBarItemEl: HTMLElement | null = null;
   private isRunning = false;
+  private currentStatus = "idle";
 
   async onload(): Promise<void> {
     await this.loadSettings();
 
     this.statusBarItemEl = this.addStatusBarItem();
     this.updateStatusBar("SYSTEM: idle");
+
+    this.registerView(
+      VIEW_TYPE_SYSTEM_ENGINE,
+      (leaf) => new SystemEngineView(leaf, this)
+    );
 
     this.addCommand({
       id: "rebuild-analytics",
@@ -43,6 +53,18 @@ export default class SystemEnginePlugin extends Plugin {
       callback: async () => {
         await this.runSync();
       },
+    });
+
+    this.addCommand({
+      id: "open-system-panel",
+      name: "Open SYSTEM panel",
+      callback: async () => {
+        await this.activateView();
+      },
+    });
+
+    this.addRibbonIcon("gantt-chart", "Open SYSTEM panel", async () => {
+      await this.activateView();
     });
 
     this.addSettingTab(new SystemEngineSettingTab(this.app, this));
@@ -79,7 +101,35 @@ export default class SystemEnginePlugin extends Plugin {
   }
 
   private updateStatusBar(text: string): void {
+    this.currentStatus = text.replace(/^SYSTEM:\s*/, "");
     this.statusBarItemEl?.setText(text);
+  }
+
+  getStatusText(): string {
+    return this.currentStatus;
+  }
+
+  async activateView(): Promise<void> {
+    const { workspace } = this.app;
+    let leaf: WorkspaceLeaf | null =
+      workspace.getLeavesOfType(VIEW_TYPE_SYSTEM_ENGINE)[0] ?? null;
+
+    if (!leaf) {
+      const rightLeaf = workspace.getRightLeaf(false);
+      if (!rightLeaf) {
+        return;
+      }
+
+      leaf = rightLeaf;
+      await leaf.setViewState({
+        type: VIEW_TYPE_SYSTEM_ENGINE,
+        active: true,
+      });
+    }
+
+    if (leaf) {
+      workspace.revealLeaf(leaf);
+    }
   }
 
   async runRebuild(): Promise<void> {
@@ -121,6 +171,71 @@ export default class SystemEnginePlugin extends Plugin {
     } finally {
       this.isRunning = false;
     }
+  }
+}
+
+class SystemEngineView extends ItemView {
+  plugin: SystemEnginePlugin;
+
+  constructor(leaf: WorkspaceLeaf, plugin: SystemEnginePlugin) {
+    super(leaf);
+    this.plugin = plugin;
+  }
+
+  getViewType(): string {
+    return VIEW_TYPE_SYSTEM_ENGINE;
+  }
+
+  getDisplayText(): string {
+    return "SYSTEM Engine";
+  }
+
+  getIcon(): string {
+    return "gantt-chart";
+  }
+
+  async onOpen(): Promise<void> {
+    this.render();
+  }
+
+  async onClose(): Promise<void> {
+    this.contentEl.empty();
+  }
+
+  private render(): void {
+    const { contentEl } = this;
+    contentEl.empty();
+    contentEl.addClass("system-engine-view");
+
+    contentEl.createEl("h2", { text: "SYSTEM Engine" });
+    contentEl.createEl("p", {
+      text: "Quick actions for analytics rebuild and ticket sync.",
+    });
+
+    const statusEl = contentEl.createEl("p");
+    statusEl.setText(`Status: ${this.plugin.getStatusText()}`);
+
+    const rebuildButton = contentEl.createEl("button", {
+      text: "Rebuild analytics",
+    });
+    rebuildButton.addEventListener("click", async () => {
+      statusEl.setText("Status: running rebuild...");
+      await this.plugin.runRebuild();
+      statusEl.setText(`Status: ${this.plugin.getStatusText()}`);
+    });
+
+    const syncButton = contentEl.createEl("button", {
+      text: "Sync spent",
+    });
+    syncButton.style.marginLeft = "8px";
+    syncButton.addEventListener("click", async () => {
+      statusEl.setText("Status: syncing spent...");
+      await this.plugin.runSync();
+      statusEl.setText(`Status: ${this.plugin.getStatusText()}`);
+    });
+
+    const pathEl = contentEl.createEl("p");
+    pathEl.setText(`Engine path: ${this.plugin.settings.enginePath}`);
   }
 }
 
