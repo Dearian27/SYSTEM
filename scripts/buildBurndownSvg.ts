@@ -9,11 +9,11 @@ async function readBurndownData(): Promise<BurndownData> {
 
 function buildPolylinePoints(
   remainingValues: number[],
+  maxValue: number,
   width: number,
   height: number,
   padding: number
 ): string {
-  const maxValue = Math.max(...remainingValues, 1);
   const chartWidth = width - padding * 2;
   const chartHeight = height - padding * 2;
 
@@ -37,8 +37,10 @@ function buildSvg(data: BurndownData): string {
   const padding = 40;
 
   const remainingValues = data.points.map((p) => p.remaining);
+  const maxValue = Math.max(data.baseline, ...remainingValues, 1);
   const polylinePoints = buildPolylinePoints(
     remainingValues,
+    maxValue,
     width,
     height,
     padding

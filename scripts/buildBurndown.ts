@@ -65,7 +65,7 @@ function buildSpentPerDayMap(sessions: SessionEntry[]): Map<string, number> {
 function buildPoints(
   dates: string[],
   spentPerDay: Map<string, number>,
-  totalEstimate: number
+  baseline: number
 ): BurndownPoint[] {
   const points: BurndownPoint[] = [];
   let cumulativeSpent = 0;
@@ -78,7 +78,7 @@ function buildPoints(
       date,
       spentToday,
       cumulativeSpent,
-      remaining: Math.max(totalEstimate - cumulativeSpent, 0),
+      remaining: Math.max(baseline - cumulativeSpent, 0),
     });
   }
 
@@ -87,7 +87,7 @@ function buildPoints(
 
 function renderAsciiBurndown(
   points: BurndownPoint[],
-  totalEstimate: number
+  baseline: number
 ): string {
   if (points.length === 0) return "No burndown data";
 
@@ -95,7 +95,7 @@ function renderAsciiBurndown(
 
   return points
     .map((point) => {
-      const ratio = totalEstimate > 0 ? point.remaining / totalEstimate : 0;
+      const ratio = baseline > 0 ? point.remaining / baseline : 0;
       const barLength = Math.round(ratio * maxBarWidth);
       const bar = "█".repeat(barLength);
       return `${point.date} | ${bar.padEnd(maxBarWidth, " ")} ${
@@ -128,12 +128,15 @@ async function main(): Promise<void> {
 
   const dates = getDateRange(currentSprint.start, currentSprint.end);
   const spentPerDay = buildSpentPerDayMap(sprintSessions);
-  const points = buildPoints(dates, spentPerDay, sprintSummary.totalEstimate);
+  const baseline = currentSprint.capacity ?? sprintSummary.totalEstimate;
+  const points = buildPoints(dates, spentPerDay, baseline);
 
   const burndownData: BurndownData = {
     sprintName: currentSprint.name,
     start: currentSprint.start,
     end: currentSprint.end,
+    capacity: currentSprint.capacity ?? null,
+    baseline,
     totalEstimate: sprintSummary.totalEstimate,
     points,
   };
@@ -144,11 +147,15 @@ async function main(): Promise<void> {
     "utf8"
   );
 
-  const asciiChart = renderAsciiBurndown(points, sprintSummary.totalEstimate);
+  const asciiChart = renderAsciiBurndown(points, baseline);
   const markdown = `## Sprint
 **${currentSprint.name}**
 
 ${currentSprint.start} → ${currentSprint.end}
+
+Sprint capacity: **${currentSprint.capacity ?? "N/A"}**
+
+Burndown baseline: **${baseline}**
 
 Total estimate: **${sprintSummary.totalEstimate}**
 

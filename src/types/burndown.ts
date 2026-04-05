@@ -9,6 +9,8 @@ export type BurndownData = {
   sprintName: string;
   start: string;
   end: string;
+  capacity: number | null;
+  baseline: number;
   totalEstimate: number;
   points: BurndownPoint[];
 };

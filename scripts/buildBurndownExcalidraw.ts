@@ -7,8 +7,9 @@ type BurndownPoint = {
 };
 
 type BurndownData =
-  | BurndownPoint[]
+  | (BurndownPoint[] & { baseline?: never })
   | {
+      baseline?: number;
       points?: BurndownPoint[];
     };
 
@@ -188,10 +189,23 @@ function createRectangleElement(params: {
   };
 }
 
-function normalizeBurndownData(input: BurndownData): BurndownPoint[] {
-  if (Array.isArray(input)) return input;
-  if (Array.isArray(input.points)) return input.points;
-  return [];
+function normalizeBurndownData(input: BurndownData): {
+  baseline: number;
+  points: BurndownPoint[];
+} {
+  if (Array.isArray(input)) {
+    const baseline = Math.max(...input.map((point) => point.remaining), 1);
+    return { baseline, points: input };
+  }
+
+  const points = Array.isArray(input.points) ? input.points : [];
+  const baseline = Math.max(
+    input.baseline ?? 0,
+    ...points.map((point) => point.remaining),
+    1
+  );
+
+  return { baseline, points };
 }
 
 function measureTextWidth(text: string, fontSize: number): number {
@@ -241,7 +255,10 @@ ${JSON.stringify(excalidrawData, null, "\t")}
 `;
 }
 
-function buildChartElements(points: BurndownPoint[]): ExcalidrawElement[] {
+function buildChartElements(
+  points: BurndownPoint[],
+  baseline: number
+): ExcalidrawElement[] {
   const elements: ExcalidrawElement[] = [];
 
   const canvasX = 40;
@@ -346,7 +363,11 @@ function buildChartElements(points: BurndownPoint[]): ExcalidrawElement[] {
     return elements;
   }
 
-  const maxRemaining = Math.max(...points.map((point) => point.remaining), 1);
+  const maxRemaining = Math.max(
+    baseline,
+    ...points.map((point) => point.remaining),
+    1
+  );
   const xStep = points.length > 1 ? chartWidth / (points.length - 1) : 0;
 
   for (let i = 0; i <= 5; i++) {
@@ -458,9 +479,9 @@ async function main(): Promise<void> {
   const raw = await readFile(PATHS.burndownFile, "utf8");
   const parsed = JSON.parse(raw) as BurndownData;
 
-  const points = normalizeBurndownData(parsed);
+  const { baseline, points } = normalizeBurndownData(parsed);
 
-  const elements = buildChartElements(points);
+  const elements = buildChartElements(points, baseline);
   const markdown = buildExcalidrawMarkdown(elements);
 
   await writeFile(PATHS.burndownExcalidrawFile, markdown, "utf8");
