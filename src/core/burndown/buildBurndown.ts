@@ -130,6 +130,7 @@ export async function buildBurndown(): Promise<BurndownData | null> {
   const spentPerDay = buildSpentPerDayMap(sprintSessions);
   const baseline = currentSprint.capacity ?? sprintSummary.totalEstimate;
   const points = buildPoints(dates, spentPerDay, baseline);
+  const visiblePoints = points.filter((point) => point.date <= today());
 
   const burndownData: BurndownData = {
     sprintName: currentSprint.name,
@@ -147,7 +148,7 @@ export async function buildBurndown(): Promise<BurndownData | null> {
     "utf8"
   );
 
-  const asciiChart = renderAsciiBurndown(points, baseline);
+  const asciiChart = renderAsciiBurndown(visiblePoints, baseline);
   const markdown = `## Sprint
 **${currentSprint.name}**
 
@@ -169,7 +170,7 @@ ${asciiChart}
 
 | Date | Spent Today | Cumulative Spent | Remaining |
 |------|-------------|------------------|-----------|
-${points
+${visiblePoints
   .map(
     (p) =>
       `| ${p.date} | ${p.spentToday} | ${p.cumulativeSpent} | ${p.remaining} |`
