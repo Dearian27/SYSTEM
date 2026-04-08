@@ -1,7 +1,5 @@
 import {
   App,
-  FileSystemAdapter,
-  ItemView,
   Notice,
   Plugin,
   PluginSettingTab,
@@ -9,10 +7,20 @@ import {
   WorkspaceLeaf,
 } from "obsidian";
 import path from "node:path";
-import { setEngineRoot } from "@/config";
+import { PATHS, setEngineRoot } from "@/config";
 import { runFullAnalyticsPipeline, syncSpentToTickets } from "@/core/analytics";
-
-const VIEW_TYPE_SYSTEM_ENGINE = "system-engine-view";
+import {
+  clearSession,
+  configureSessionPaths,
+  getDailyDirVaultPath,
+  loadSessionsForDate,
+  saveSession,
+} from "@/core/sessions/sessionStorage";
+import {
+  SystemEngineView,
+  VIEW_TYPE_SYSTEM_ENGINE,
+} from "@/ui/systemEngineView";
+import { readTickets } from "@/utils/readTickets";
 
 type SystemEngineSettings = {
   enginePath: string;
@@ -86,18 +94,19 @@ export default class SystemEnginePlugin extends Plugin {
     await this.saveData(this.settings);
   }
 
-  private getVaultBasePath(): string {
+  private getEngineAbsolutePath(): string {
     const adapter = this.app.vault.adapter;
-    if (!(adapter instanceof FileSystemAdapter)) {
+    if (!("getBasePath" in adapter) || typeof adapter.getBasePath !== "function") {
       throw new Error("SYSTEM Engine requires the desktop file system adapter.");
     }
 
-    return adapter.getBasePath();
+    return path.resolve(adapter.getBasePath(), this.settings.enginePath);
   }
 
-  private getEngineAbsolutePath(): string {
-    const basePath = this.getVaultBasePath();
-    return path.resolve(basePath, this.settings.enginePath);
+  private configurePaths(): void {
+    const engineRoot = this.getEngineAbsolutePath();
+    setEngineRoot(engineRoot);
+    configureSessionPaths(engineRoot);
   }
 
   private updateStatusBar(text: string): void {
@@ -107,6 +116,34 @@ export default class SystemEnginePlugin extends Plugin {
 
   getStatusText(): string {
     return this.currentStatus;
+  }
+
+  getDailyDirVaultPath(): string {
+    this.configurePaths();
+    return getDailyDirVaultPath(this.app);
+  }
+
+  async getTicketNames(): Promise<string[]> {
+    this.configurePaths();
+    const tickets = await readTickets();
+    return tickets.map((ticket) => ticket.ticketName).sort((a, b) =>
+      a.localeCompare(b)
+    );
+  }
+
+  async loadSessionsForDate(date: string): Promise<Map<string, string>> {
+    this.configurePaths();
+    return await loadSessionsForDate(this.app, date);
+  }
+
+  async saveSession(date: string, time: string, ticketName: string): Promise<void> {
+    this.configurePaths();
+    await saveSession(this.app, date, time, ticketName);
+  }
+
+  async clearSession(date: string, time: string): Promise<void> {
+    this.configurePaths();
+    await clearSession(this.app, date, time);
   }
 
   async activateView(): Promise<void> {
@@ -134,14 +171,14 @@ export default class SystemEnginePlugin extends Plugin {
 
   async runRebuild(): Promise<void> {
     await this.runTask("Analytics rebuild completed", async () => {
-      setEngineRoot(this.getEngineAbsolutePath());
+      this.configurePaths();
       await runFullAnalyticsPipeline();
     });
   }
 
   async runSync(): Promise<void> {
     await this.runTask("Spent sync completed", async () => {
-      setEngineRoot(this.getEngineAbsolutePath());
+      this.configurePaths();
       await syncSpentToTickets();
     });
   }
@@ -171,71 +208,6 @@ export default class SystemEnginePlugin extends Plugin {
     } finally {
       this.isRunning = false;
     }
-  }
-}
-
-class SystemEngineView extends ItemView {
-  plugin: SystemEnginePlugin;
-
-  constructor(leaf: WorkspaceLeaf, plugin: SystemEnginePlugin) {
-    super(leaf);
-    this.plugin = plugin;
-  }
-
-  getViewType(): string {
-    return VIEW_TYPE_SYSTEM_ENGINE;
-  }
-
-  getDisplayText(): string {
-    return "SYSTEM Engine";
-  }
-
-  getIcon(): string {
-    return "gantt-chart";
-  }
-
-  async onOpen(): Promise<void> {
-    this.render();
-  }
-
-  async onClose(): Promise<void> {
-    this.contentEl.empty();
-  }
-
-  private render(): void {
-    const { contentEl } = this;
-    contentEl.empty();
-    contentEl.addClass("system-engine-view");
-
-    contentEl.createEl("h2", { text: "SYSTEM Engine" });
-    contentEl.createEl("p", {
-      text: "Quick actions for analytics rebuild and ticket sync.",
-    });
-
-    const statusEl = contentEl.createEl("p");
-    statusEl.setText(`Status: ${this.plugin.getStatusText()}`);
-
-    const rebuildButton = contentEl.createEl("button", {
-      text: "Rebuild analytics",
-    });
-    rebuildButton.addEventListener("click", async () => {
-      statusEl.setText("Status: running rebuild...");
-      await this.plugin.runRebuild();
-      statusEl.setText(`Status: ${this.plugin.getStatusText()}`);
-    });
-
-    const syncButton = contentEl.createEl("button", {
-      text: "Sync spent",
-    });
-    syncButton.style.marginLeft = "8px";
-    syncButton.addEventListener("click", async () => {
-      statusEl.setText("Status: syncing spent...");
-      await this.plugin.runSync();
-      statusEl.setText(`Status: ${this.plugin.getStatusText()}`);
-    });
-
-    const pathEl = contentEl.createEl("p");
-    pathEl.setText(`Engine path: ${this.plugin.settings.enginePath}`);
   }
 }
 
