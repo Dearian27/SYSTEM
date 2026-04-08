@@ -15,6 +15,7 @@ export type SystemEngineViewHost = {
   };
   getStatusText(): string;
   runRebuild(): Promise<void>;
+  runLightRefresh(): Promise<void>;
   runSync(): Promise<void>;
   getTicketNames(): Promise<string[]>;
   loadSessionsForDate(date: string): Promise<Map<string, string>>;
@@ -146,8 +147,9 @@ export class SystemEngineView extends ItemView {
             time,
             chosenTicket,
           });
+          await this.plugin.runLightRefresh();
           await this.render();
-          new Notice(`Saved ${time} -> ${chosenTicket}`);
+          new Notice(`Saved ${time} -> ${chosenTicket} and refreshed analytics`);
         } catch (error) {
           console.error("Failed to save session", error);
           new Notice(`Failed to save session: ${getErrorMessage(error)}`, 12000);
@@ -159,7 +161,9 @@ export class SystemEngineView extends ItemView {
       clearButton.addEventListener("click", async () => {
         try {
           await this.plugin.clearSession(this.selectedDate, time);
+          await this.plugin.runLightRefresh();
           await this.render();
+          new Notice(`Cleared ${time} and refreshed analytics`);
         } catch (error) {
           console.error("Failed to clear session", error);
           new Notice(`Failed to clear session: ${getErrorMessage(error)}`, 12000);

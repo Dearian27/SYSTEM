@@ -8,7 +8,7 @@ import { buildTicketSpent } from "@/core/tickets/buildTicketSpent";
 import { buildTicketStats } from "@/core/tickets/buildTicketStats";
 import { syncSpentToTickets } from "@/core/tickets/syncSpentToTickets";
 
-export async function runFullAnalyticsPipeline(): Promise<void> {
+export async function runLightAnalyticsRefresh(): Promise<void> {
   await parseDailySessions();
   await buildTicketSpent();
   await buildTicketStats();
@@ -18,8 +18,8 @@ export async function runFullAnalyticsPipeline(): Promise<void> {
     return;
   }
 
-  await buildDashboard();
   const burndownData = await buildBurndown();
+  await buildDashboard();
 
   if (burndownData) {
     await buildBurndownSvg();
@@ -27,6 +27,10 @@ export async function runFullAnalyticsPipeline(): Promise<void> {
   }
 
   await syncSpentToTickets();
+}
+
+export async function runFullAnalyticsPipeline(): Promise<void> {
+  await runLightAnalyticsRefresh();
 }
 
 export {

@@ -8,7 +8,11 @@ import {
 } from "obsidian";
 import path from "node:path";
 import { PATHS, setEngineRoot } from "@/config";
-import { runFullAnalyticsPipeline, syncSpentToTickets } from "@/core/analytics";
+import {
+  runFullAnalyticsPipeline,
+  runLightAnalyticsRefresh,
+  syncSpentToTickets,
+} from "@/core/analytics";
 import {
   clearSession,
   configureSessionPaths,
@@ -180,6 +184,13 @@ export default class SystemEnginePlugin extends Plugin {
     await this.runTask("Spent sync completed", async () => {
       this.configurePaths();
       await syncSpentToTickets();
+    });
+  }
+
+  async runLightRefresh(): Promise<void> {
+    await this.runTask("Analytics refreshed", async () => {
+      this.configurePaths();
+      await runLightAnalyticsRefresh();
     });
   }
 
