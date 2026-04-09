@@ -33,6 +33,7 @@ export function setEngineRoot(engineRoot: string): void {
 }
 
 export const HEADINGS = {
+  plan: "## Plan",
   sessions: "## Sessions",
 };
 

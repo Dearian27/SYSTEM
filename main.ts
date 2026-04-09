@@ -14,10 +14,13 @@ import {
   syncSpentToTickets,
 } from "@/core/analytics";
 import {
+  clearPlan,
   clearSession,
   configureSessionPaths,
   getDailyDirVaultPath,
+  loadPlanForDate,
   loadSessionsForDate,
+  savePlan,
   saveSession,
 } from "@/core/sessions/sessionStorage";
 import {
@@ -140,14 +143,29 @@ export default class SystemEnginePlugin extends Plugin {
     return await loadSessionsForDate(this.app, date);
   }
 
+  async loadPlanForDate(date: string): Promise<Map<string, string>> {
+    this.configurePaths();
+    return await loadPlanForDate(this.app, date);
+  }
+
   async saveSession(date: string, time: string, ticketName: string): Promise<void> {
     this.configurePaths();
     await saveSession(this.app, date, time, ticketName);
   }
 
+  async savePlan(date: string, time: string, ticketName: string): Promise<void> {
+    this.configurePaths();
+    await savePlan(this.app, date, time, ticketName);
+  }
+
   async clearSession(date: string, time: string): Promise<void> {
     this.configurePaths();
     await clearSession(this.app, date, time);
+  }
+
+  async clearPlan(date: string, time: string): Promise<void> {
+    this.configurePaths();
+    await clearPlan(this.app, date, time);
   }
 
   async activateView(): Promise<void> {

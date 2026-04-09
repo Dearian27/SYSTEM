@@ -1,7 +1,14 @@
 import { App, FileSystemAdapter, TFile, normalizePath } from "obsidian";
 import path from "node:path";
 import { HEADINGS, PATHS, setEngineRoot } from "@/config";
-import { parseSessionMap, updateSessionsSection } from "@/core/sessions/sessionNote";
+import {
+  parsePlannedMap,
+  parseSessionMap,
+  updatePlanSection,
+  updateSessionsSection,
+} from "@/core/sessions/sessionNote";
+
+export type SessionSection = "plan" | "sessions";
 
 function getVaultBasePath(app: App): string {
   const adapter = app.vault.adapter;
@@ -29,9 +36,24 @@ export async function loadSessionsForDate(
   app: App,
   date: string
 ): Promise<Map<string, string>> {
+  return await loadSectionForDate(app, date, "sessions");
+}
+
+export async function loadPlanForDate(
+  app: App,
+  date: string
+): Promise<Map<string, string>> {
+  return await loadSectionForDate(app, date, "plan");
+}
+
+export async function loadSectionForDate(
+  app: App,
+  date: string,
+  section: SessionSection
+): Promise<Map<string, string>> {
   const file = await getOrCreateDailyFile(app, date);
   const content = await app.vault.read(file);
-  return parseSessionMap(content);
+  return section === "plan" ? parsePlannedMap(content) : parseSessionMap(content);
 }
 
 export async function saveSession(
@@ -40,11 +62,34 @@ export async function saveSession(
   time: string,
   ticketName: string
 ): Promise<void> {
+  await saveSection(app, date, time, ticketName, "sessions");
+}
+
+export async function savePlan(
+  app: App,
+  date: string,
+  time: string,
+  ticketName: string
+): Promise<void> {
+  await saveSection(app, date, time, ticketName, "plan");
+}
+
+export async function saveSection(
+  app: App,
+  date: string,
+  time: string,
+  ticketName: string,
+  section: SessionSection
+): Promise<void> {
   const file = await getOrCreateDailyFile(app, date);
   const content = await app.vault.read(file);
-  const sessionMap = parseSessionMap(content);
+  const sessionMap =
+    section === "plan" ? parsePlannedMap(content) : parseSessionMap(content);
   sessionMap.set(time, ticketName);
-  const updated = updateSessionsSection(content, sessionMap);
+  const updated =
+    section === "plan"
+      ? updatePlanSection(content, sessionMap)
+      : updateSessionsSection(content, sessionMap);
   await app.vault.modify(file, updated);
 }
 
@@ -53,15 +98,36 @@ export async function clearSession(
   date: string,
   time: string
 ): Promise<void> {
+  await clearSection(app, date, time, "sessions");
+}
+
+export async function clearPlan(
+  app: App,
+  date: string,
+  time: string
+): Promise<void> {
+  await clearSection(app, date, time, "plan");
+}
+
+export async function clearSection(
+  app: App,
+  date: string,
+  time: string,
+  section: SessionSection
+): Promise<void> {
   const file = await findDailyFile(app, date);
   if (!file) {
     return;
   }
 
   const content = await app.vault.read(file);
-  const sessionMap = parseSessionMap(content);
+  const sessionMap =
+    section === "plan" ? parsePlannedMap(content) : parseSessionMap(content);
   sessionMap.delete(time);
-  const updated = updateSessionsSection(content, sessionMap);
+  const updated =
+    section === "plan"
+      ? updatePlanSection(content, sessionMap)
+      : updateSessionsSection(content, sessionMap);
   await app.vault.modify(file, updated);
 }
 
@@ -73,7 +139,7 @@ async function getOrCreateDailyFile(app: App, date: string): Promise<TFile> {
 
   const dailyDir = getDailyDirVaultPath(app);
   const filePath = normalizePath(`${dailyDir}/${date}.md`);
-  const initialContent = `${HEADINGS.sessions}\n`;
+  const initialContent = `${HEADINGS.plan}\n\n${HEADINGS.sessions}\n`;
   return await app.vault.create(filePath, initialContent);
 }
 
