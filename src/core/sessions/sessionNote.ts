@@ -37,10 +37,19 @@ function updateSection(
     .map(([time, ticketName]) => `\`${time}\` | [[${ticketName}]]`);
   const section = `${heading}\n${lines.join("\n")}`.trimEnd();
   const escapedHeading = escapeRegex(heading);
-  const regex = new RegExp(`${escapedHeading}\\s*[\\s\\S]*?(?=\\n## |\\n# |$)`);
+  const regex = new RegExp(
+    `(^|\\n)${escapedHeading}(?:\\n[\\s\\S]*?)?(?=\\n## |\\n# |$)`,
+    "m"
+  );
 
   if (regex.test(content)) {
-    return content.replace(regex, section);
+    return content.replace(regex, (_match, prefix: string) => `${prefix}${section}`);
+  }
+
+  // Keep plan visually and semantically before sessions when adding it later.
+  if (heading === HEADINGS.plan && content.includes(HEADINGS.sessions)) {
+    const sessionsRegex = new RegExp(`(^|\\n)${escapeRegex(HEADINGS.sessions)}\\b`);
+    return content.replace(sessionsRegex, `\n${section}\n\n${HEADINGS.sessions}`);
   }
 
   const trimmed = content.trimEnd();

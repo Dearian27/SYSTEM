@@ -4,3 +4,9 @@ export type SessionEntry = {
   ticketName: string;
   sourceFile: string;
 };
+
+export enum ViewMode {
+  PLAN = "plan",
+  ACTUAL = "actual",
+  COMPARE = "compare",
+}

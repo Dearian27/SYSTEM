@@ -1,3 +1,5 @@
+import { getClearButtonText, getHintText } from "@/constants/engine-view";
+import { ViewMode } from "@/types/daily";
 import {
   App,
   FuzzySuggestModal,
@@ -18,14 +20,18 @@ export type SystemEngineViewHost = {
   runLightRefresh(): Promise<void>;
   runSync(): Promise<void>;
   getTicketNames(): Promise<string[]>;
+  loadPlanForDate(date: string): Promise<Map<string, string>>;
   loadSessionsForDate(date: string): Promise<Map<string, string>>;
+  savePlan(date: string, time: string, ticketName: string): Promise<void>;
   saveSession(date: string, time: string, ticketName: string): Promise<void>;
+  clearPlan(date: string, time: string): Promise<void>;
   clearSession(date: string, time: string): Promise<void>;
 };
 
 export class SystemEngineView extends ItemView {
   private readonly plugin: SystemEngineViewHost;
   private selectedDate = todayDateString();
+  private currentMode: ViewMode = ViewMode.ACTUAL;
 
   constructor(leaf: WorkspaceLeaf, plugin: SystemEngineViewHost) {
     super(leaf);
@@ -88,9 +94,12 @@ export class SystemEngineView extends ItemView {
     pathEl.setText(`Engine path: ${this.plugin.settings.enginePath}`);
 
     contentEl.createEl("hr");
-    contentEl.createEl("h3", { text: "Daily Sessions" });
+    contentEl.createEl("h3", { text: "Daily Planning" });
 
     const dateRow = contentEl.createDiv();
+    dateRow.style.display = "flex";
+    dateRow.style.gap = "8px";
+    dateRow.style.alignItems = "center";
     const dateInput = dateRow.createEl("input", { type: "date" });
     dateInput.value = this.selectedDate;
     dateInput.addEventListener("change", async () => {
@@ -98,6 +107,26 @@ export class SystemEngineView extends ItemView {
       await this.render();
     });
 
+    const modeSelect = dateRow.createEl("select");
+    for (const mode of Object.values(ViewMode)) {
+      const option = modeSelect.createEl("option", {
+        text: capitalize(mode),
+        value: mode,
+      });
+      option.selected = mode === this.currentMode;
+    }
+    modeSelect.addEventListener("change", async () => {
+      this.currentMode = (modeSelect.value as ViewMode) || "actual";
+      await this.render();
+    });
+
+    const hintEl = contentEl.createEl("p");
+    hintEl.style.opacity = "0.75";
+    hintEl.style.marginTop = "8px";
+    const hintContent = getHintText(this.currentMode);
+    hintEl.setText(hintContent);
+
+    const plan = await this.plugin.loadPlanForDate(this.selectedDate);
     const sessions = await this.plugin.loadSessionsForDate(this.selectedDate);
     const slotsEl = contentEl.createDiv();
     slotsEl.style.display = "grid";
@@ -106,69 +135,152 @@ export class SystemEngineView extends ItemView {
     for (const time of buildTimeSlots()) {
       const row = slotsEl.createDiv();
       row.style.display = "grid";
-      row.style.gridTemplateColumns = "56px 1fr auto";
+      row.style.gridTemplateColumns =
+        this.currentMode === ViewMode.COMPARE
+          ? "56px 1fr 1fr auto"
+          : "56px 1fr auto";
       row.style.gap = "8px";
       row.style.alignItems = "center";
+      row.style.padding = "4px 0";
 
       row.createEl("code", { text: time });
 
-      const ticketName = sessions.get(time) ?? "";
-      const slotButton = row.createEl("button", {
-        text: ticketName || "Add session",
+      const plannedTicket = plan.get(time) ?? "";
+      const actualTicket = sessions.get(time) ?? "";
+
+      if (this.currentMode === ViewMode.COMPARE) {
+        renderSlotButton({
+          row,
+          label: plannedTicket || "Plan slot",
+          filled: Boolean(plannedTicket),
+          muted: !plannedTicket,
+          borderColor:
+            actualTicket && plannedTicket === actualTicket
+              ? "#2f9e44"
+              : "#d0d7de",
+          onClick: async () => {
+            await this.handleSlotEdit(ViewMode.PLAN, time);
+          },
+        });
+
+        renderSlotButton({
+          row,
+          label: actualTicket || "Actual slot",
+          filled: Boolean(actualTicket),
+          muted: !actualTicket,
+          borderColor:
+            plannedTicket && plannedTicket !== actualTicket
+              ? "#e67700"
+              : "#d0d7de",
+          onClick: async () => {
+            await this.handleSlotEdit(ViewMode.ACTUAL, time);
+          },
+        });
+      } else {
+        const isPlanMode = this.currentMode === "plan";
+        const currentTicket = isPlanMode ? plannedTicket : actualTicket;
+        renderSlotButton({
+          row,
+          label:
+            currentTicket || (isPlanMode ? "Add planned work" : "Add session"),
+          filled: Boolean(currentTicket),
+          muted: !currentTicket,
+          borderColor:
+            plannedTicket && actualTicket && plannedTicket === actualTicket
+              ? "#2f9e44"
+              : "#d0d7de",
+          onClick: async () => {
+            await this.handleSlotEdit(
+              isPlanMode ? ViewMode.PLAN : ViewMode.ACTUAL,
+              time
+            );
+          },
+        });
+      }
+
+      const clearButton = row.createEl("button", {
+        text: getClearButtonText(this.currentMode),
       });
-      slotButton.addEventListener("click", async () => {
-        try {
-          console.info("[SYSTEM] Slot clicked", {
-            date: this.selectedDate,
-            time,
-          });
-          const ticketNames = await this.plugin.getTicketNames();
-          console.info("[SYSTEM] Ticket names loaded", {
-            count: ticketNames.length,
-          });
-          if (ticketNames.length === 0) {
-            new Notice("No tickets found for selection.");
-            return;
-          }
 
-          const chosenTicket = await openTicketPicker(this.app, ticketNames);
-          console.info("[SYSTEM] Ticket picker resolved", {
-            chosenTicket,
-            date: this.selectedDate,
-            time,
-          });
-          if (!chosenTicket) {
-            return;
-          }
+      clearButton.disabled =
+        this.currentMode === "plan" ? !plannedTicket : !actualTicket;
 
-          await this.plugin.saveSession(this.selectedDate, time, chosenTicket);
-          console.info("[SYSTEM] Session saved", {
-            date: this.selectedDate,
-            time,
-            chosenTicket,
-          });
-          await this.plugin.runLightRefresh();
-          await this.render();
-          new Notice(`Saved ${time} -> ${chosenTicket} and refreshed analytics`);
-        } catch (error) {
-          console.error("Failed to save session", error);
-          new Notice(`Failed to save session: ${getErrorMessage(error)}`, 12000);
-        }
-      });
-
-      const clearButton = row.createEl("button", { text: "Clear" });
-      clearButton.disabled = !ticketName;
       clearButton.addEventListener("click", async () => {
-        try {
-          await this.plugin.clearSession(this.selectedDate, time);
-          await this.plugin.runLightRefresh();
-          await this.render();
-          new Notice(`Cleared ${time} and refreshed analytics`);
-        } catch (error) {
-          console.error("Failed to clear session", error);
-          new Notice(`Failed to clear session: ${getErrorMessage(error)}`, 12000);
-        }
+        await this.handleClear(
+          this.currentMode === ViewMode.PLAN ? ViewMode.PLAN : ViewMode.ACTUAL,
+          time
+        );
       });
+    }
+  }
+
+  private async handleSlotEdit(
+    mode: ViewMode.PLAN | ViewMode.ACTUAL,
+    time: string
+  ): Promise<void> {
+    try {
+      console.info("[SYSTEM] Slot clicked", {
+        mode,
+        date: this.selectedDate,
+        time,
+      });
+      const ticketNames = await this.plugin.getTicketNames();
+      console.info("[SYSTEM] Ticket names loaded", {
+        mode,
+        count: ticketNames.length,
+      });
+      if (ticketNames.length === 0) {
+        new Notice("No tickets found for selection.");
+        return;
+      }
+
+      const chosenTicket = await openTicketPicker(this.app, ticketNames);
+      console.info("[SYSTEM] Ticket picker resolved", {
+        mode,
+        chosenTicket,
+        date: this.selectedDate,
+        time,
+      });
+      if (!chosenTicket) {
+        return;
+      }
+
+      if (mode === "plan") {
+        await this.plugin.savePlan(this.selectedDate, time, chosenTicket);
+        await this.render();
+        new Notice(`Planned ${time} -> ${chosenTicket}`);
+        return;
+      }
+
+      await this.plugin.saveSession(this.selectedDate, time, chosenTicket);
+      await this.plugin.runLightRefresh();
+      await this.render();
+      new Notice(`Saved ${time} -> ${chosenTicket} and refreshed analytics`);
+    } catch (error) {
+      console.error(`Failed to save ${mode} entry`, error);
+      new Notice(`Failed to save ${mode}: ${getErrorMessage(error)}`, 12000);
+    }
+  }
+
+  private async handleClear(
+    mode: "plan" | "actual",
+    time: string
+  ): Promise<void> {
+    try {
+      if (mode === "plan") {
+        await this.plugin.clearPlan(this.selectedDate, time);
+        await this.render();
+        new Notice(`Cleared planned slot ${time}`);
+        return;
+      }
+
+      await this.plugin.clearSession(this.selectedDate, time);
+      await this.plugin.runLightRefresh();
+      await this.render();
+      new Notice(`Cleared ${time} and refreshed analytics`);
+    } catch (error) {
+      console.error(`Failed to clear ${mode} entry`, error);
+      new Notice(`Failed to clear ${mode}: ${getErrorMessage(error)}`, 12000);
     }
   }
 }
@@ -260,4 +372,30 @@ function getErrorMessage(error: unknown): string {
   }
 
   return String(error);
+}
+
+function capitalize(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function renderSlotButton(params: {
+  row: HTMLElement;
+  label: string;
+  filled: boolean;
+  muted: boolean;
+  borderColor: string;
+  onClick: () => Promise<void>;
+}): void {
+  const { row, label, filled, muted, borderColor, onClick } = params;
+  const button = row.createEl("button", {
+    text: label,
+  });
+  button.style.textAlign = "left";
+  button.style.justifyContent = "flex-start";
+  button.style.border = `1px solid ${borderColor}`;
+  button.style.background = filled ? "#f8f9fa" : "#ffffff";
+  button.style.opacity = muted ? "0.72" : "1";
+  button.addEventListener("click", async () => {
+    await onClick();
+  });
 }

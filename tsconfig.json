@@ -4,9 +4,9 @@
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "lib": ["DOM", "ES2022"],
-    "baseUrl": "./src",
+    "baseUrl": ".",
     "paths": {
-      "@/*": ["*"]
+      "@/*": ["src/*"]
     },
     "strict": true,
     "noEmit": true,
@@ -16,5 +16,11 @@
   },
  
   
-  "include": ["main.ts", "src/**/*.ts", "scripts/**/*.ts", "constants.ts"]
+  "include": [
+    "main.ts",
+    "src/**/*.ts",
+    "scripts/**/*.ts",
+    "tests/**/*.ts",
+    "constants.ts"
+  ]
 }

@@ -254,8 +254,12 @@ dashboard → frontend
 
 ## Notes
 
-- `_engine` should be excluded from Obsidian search
+- `.engine` should be excluded from Obsidian search
 - `.generated` should not be committed to git
 - prefer simplicity over premature optimization
 
 ---
+
+## Terminology
+
+- Effort points (EF) – measures the effort (30mins of work), wasted in the tickets, it gets calculated for doing analytics
