@@ -59,6 +59,28 @@ describe("sessionNote", () => {
     );
   });
 
+  it("deduplicates repeated times when rewriting a sessions section", () => {
+    const content = `## Sessions
+\`14:00\` | [[English learning]]
+\`14:30\` | [[English learning]]
+\`14:00\` | [[English learning]]
+\`22:30\` | [[Colony - Max Kidruk]]
+\`14:00\` | [[English learning]]
+`;
+
+    const parsed = parseSessionMap(content);
+    parsed.set("23:00", "Colony - Max Kidruk");
+
+    const updated = updateSessionsSection(content, parsed);
+
+    expect(updated.match(/`14:00`/g)).toHaveLength(1);
+    expect(updated).toBe(`## Sessions
+\`14:00\` | [[English learning]]
+\`14:30\` | [[English learning]]
+\`22:30\` | [[Colony - Max Kidruk]]
+\`23:00\` | [[Colony - Max Kidruk]]`);
+  });
+
   it("ignores malformed lines while parsing", () => {
     const content = `## Sessions\n\`09:00\` | [[Valid Work]]\nnot-a-session\n10:00 | Missing Brackets\n`;
 

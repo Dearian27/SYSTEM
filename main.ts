@@ -14,6 +14,11 @@ import {
   syncSpentToTickets,
 } from "@/core/analytics";
 import {
+  createHabit,
+  loadHabitDashboard,
+  toggleHabitCompletion,
+} from "@/core/habits/habitStorage";
+import {
   clearPlan,
   clearSession,
   configureSessionPaths,
@@ -27,6 +32,11 @@ import {
   SystemEngineView,
   VIEW_TYPE_SYSTEM_ENGINE,
 } from "@/ui/systemEngineView";
+import {
+  SystemHomeView,
+  VIEW_TYPE_SYSTEM_HOME,
+} from "@/ui/systemHomeView";
+import type { HabitDashboard, HabitSchedule } from "@/types/habit";
 import { readTickets } from "@/utils/readTickets";
 
 type SystemEngineSettings = {
@@ -53,6 +63,10 @@ export default class SystemEnginePlugin extends Plugin {
       VIEW_TYPE_SYSTEM_ENGINE,
       (leaf) => new SystemEngineView(leaf, this)
     );
+    this.registerView(
+      VIEW_TYPE_SYSTEM_HOME,
+      (leaf) => new SystemHomeView(leaf, this)
+    );
 
     this.addCommand({
       id: "rebuild-analytics",
@@ -78,8 +92,20 @@ export default class SystemEnginePlugin extends Plugin {
       },
     });
 
+    this.addCommand({
+      id: "open-system-home",
+      name: "Open SYSTEM home",
+      callback: async () => {
+        await this.activateHomeView();
+      },
+    });
+
     this.addRibbonIcon("gantt-chart", "Open SYSTEM panel", async () => {
       await this.activateView();
+    });
+
+    this.addRibbonIcon("layout-dashboard", "Open SYSTEM home", async () => {
+      await this.activateHomeView();
     });
 
     this.addSettingTab(new SystemEngineSettingTab(this.app, this));
@@ -168,6 +194,30 @@ export default class SystemEnginePlugin extends Plugin {
     await clearPlan(this.app, date, time);
   }
 
+  async loadHabitDashboard(): Promise<HabitDashboard> {
+    this.configurePaths();
+    return await loadHabitDashboard();
+  }
+
+  async createHabit(input: {
+    name: string;
+    description?: string;
+    requiredCompletion: number;
+    schedule: HabitSchedule;
+  }): Promise<void> {
+    this.configurePaths();
+    await createHabit(input);
+  }
+
+  async toggleHabitCompletion(habitId: string, date: string): Promise<void> {
+    this.configurePaths();
+    await toggleHabitCompletion(habitId, date);
+  }
+
+  async openHome(): Promise<void> {
+    await this.activateHomeView();
+  }
+
   async activateView(): Promise<void> {
     const { workspace } = this.app;
     let leaf: WorkspaceLeaf | null =
@@ -189,6 +239,22 @@ export default class SystemEnginePlugin extends Plugin {
     if (leaf) {
       workspace.revealLeaf(leaf);
     }
+  }
+
+  async activateHomeView(): Promise<void> {
+    const { workspace } = this.app;
+    let leaf: WorkspaceLeaf | null =
+      workspace.getLeavesOfType(VIEW_TYPE_SYSTEM_HOME)[0] ?? null;
+
+    if (!leaf) {
+      leaf = workspace.getLeaf(false);
+      await leaf.setViewState({
+        type: VIEW_TYPE_SYSTEM_HOME,
+        active: true,
+      });
+    }
+
+    workspace.revealLeaf(leaf);
   }
 
   async runRebuild(): Promise<void> {

@@ -7,8 +7,9 @@
   "scripts": {
     "check": "tsc -p tsconfig.json",
     "test": "vitest run",
+    "test:watch": "vitest",
     "dev:plugin": "node esbuild.config.mjs",
-    "build:plugin": "node esbuild.config.mjs production",
+    "build": "node esbuild.config.mjs production",
     "parse:sessions": "tsx -r tsconfig-paths/register scripts/parseDailySessions.ts",
     "build:ticket-spent": "tsx -r tsconfig-paths/register scripts/buildTicketSpent.ts",
     "build:ticket-stats": "tsx -r tsconfig-paths/register scripts/buildTicketStats.ts",
@@ -25,6 +26,7 @@
   "devDependencies": {
     "esbuild": "^0.25.10",
     "@types/node": "^25.5.0",
+    "jsdom": "^26.1.0",
     "obsidian": "^1.8.10",
     "tsconfig-paths": "^4.2.0",
     "tsx": "^4.21.0",

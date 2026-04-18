@@ -14,6 +14,7 @@ function buildPaths(engineRoot: string) {
     dailyDir: path.resolve(engineRoot, "../Daily Reports"),
     ticketsDir: path.resolve(engineRoot, "../Tickets"),
     sprintsDir: path.resolve(engineRoot, "../Sprints"),
+    habitsFile: path.resolve(engineRoot, "habits.json"),
     generatedDir: path.resolve(engineRoot, ".generated"),
     sessionsFile: path.resolve(engineRoot, ".generated/sessions.json"),
     ticketSpentFile: path.resolve(engineRoot, ".generated/ticket-spent.json"),

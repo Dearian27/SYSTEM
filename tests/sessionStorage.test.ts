@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { FileSystemAdapter } from "obsidian";
+import { FileSystemAdapter } from "./mocks/obsidian";
 import {
   clearPlan,
   clearSession,
@@ -88,6 +88,64 @@ describe("sessionStorage", () => {
     expect(content).toContain("## Plan\n`09:00` | [[Plan Work]]");
     expect(content).toContain("## Sessions\n`10:00` | [[Actual Work]]");
     expect(content).toContain("## Notes\nHello");
+  });
+
+  it("serializes concurrent session saves for the same daily note", async () => {
+    const filePath = "SYSTEM/Daily Reports/2026-04-10.md";
+    const ctx = createFakeApp({
+      [filePath]: "## Sessions\n",
+    });
+
+    await Promise.all([
+      saveSession(ctx.app as never, "2026-04-10", "14:00", "English learning"),
+      saveSession(ctx.app as never, "2026-04-10", "14:30", "English learning"),
+      saveSession(
+        ctx.app as never,
+        "2026-04-10",
+        "22:30",
+        "Colony - Max Kidruk"
+      ),
+    ]);
+
+    expect(ctx.readContent(filePath)).toBe(`## Sessions
+\`14:00\` | [[English learning]]
+\`14:30\` | [[English learning]]
+\`22:30\` | [[Colony - Max Kidruk]]`);
+  });
+
+  it("normalizes duplicated session rows when saving a new session", async () => {
+    const filePath = "SYSTEM/Daily Reports/2026-04-10.md";
+    const ctx = createFakeApp({
+      [filePath]: `## Sessions
+\`14:00\` | [[English learning]]
+\`14:00\` | [[English learning]]
+\`14:30\` | [[English learning]]
+`,
+    });
+
+    await saveSession(
+      ctx.app as never,
+      "2026-04-10",
+      "22:30",
+      "Colony - Max Kidruk"
+    );
+
+    expect(ctx.readContent(filePath)).toBe(`## Sessions
+\`14:00\` | [[English learning]]
+\`14:30\` | [[English learning]]
+\`22:30\` | [[Colony - Max Kidruk]]`);
+  });
+
+  it("does not create daily notes just by loading sessions", async () => {
+    const ctx = createFakeApp();
+
+    const sessions = await loadSessionsForDate(
+      ctx.app as never,
+      "2026-04-10"
+    );
+
+    expect(sessions).toEqual(new Map());
+    expect(ctx.app.vault.create).not.toHaveBeenCalled();
   });
 
   it("inserts plan before existing sessions when saving plan into an existing note", async () => {

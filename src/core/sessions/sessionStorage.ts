@@ -10,6 +10,8 @@ import {
 
 export type SessionSection = "plan" | "sessions";
 
+const writeQueues = new Map<string, Promise<void>>();
+
 function getVaultBasePath(app: App): string {
   const adapter = app.vault.adapter;
   if (!(adapter instanceof FileSystemAdapter)) {
@@ -51,7 +53,11 @@ export async function loadSectionForDate(
   date: string,
   section: SessionSection
 ): Promise<Map<string, string>> {
-  const file = await getOrCreateDailyFile(app, date);
+  const file = await findDailyFile(app, date);
+  if (!file) {
+    return new Map();
+  }
+
   const content = await app.vault.read(file);
   return section === "plan" ? parsePlannedMap(content) : parseSessionMap(content);
 }
@@ -81,16 +87,18 @@ export async function saveSection(
   ticketName: string,
   section: SessionSection
 ): Promise<void> {
-  const file = await getOrCreateDailyFile(app, date);
-  const content = await app.vault.read(file);
-  const sessionMap =
-    section === "plan" ? parsePlannedMap(content) : parseSessionMap(content);
-  sessionMap.set(time, ticketName);
-  const updated =
-    section === "plan"
-      ? updatePlanSection(content, sessionMap)
-      : updateSessionsSection(content, sessionMap);
-  await app.vault.modify(file, updated);
+  await queueDailyWrite(app, date, async () => {
+    const file = await getOrCreateDailyFile(app, date);
+    const content = await app.vault.read(file);
+    const sessionMap =
+      section === "plan" ? parsePlannedMap(content) : parseSessionMap(content);
+    sessionMap.set(time, ticketName);
+    const updated =
+      section === "plan"
+        ? updatePlanSection(content, sessionMap)
+        : updateSessionsSection(content, sessionMap);
+    await app.vault.modify(file, updated);
+  });
 }
 
 export async function clearSession(
@@ -115,20 +123,22 @@ export async function clearSection(
   time: string,
   section: SessionSection
 ): Promise<void> {
-  const file = await findDailyFile(app, date);
-  if (!file) {
-    return;
-  }
+  await queueDailyWrite(app, date, async () => {
+    const file = await findDailyFile(app, date);
+    if (!file) {
+      return;
+    }
 
-  const content = await app.vault.read(file);
-  const sessionMap =
-    section === "plan" ? parsePlannedMap(content) : parseSessionMap(content);
-  sessionMap.delete(time);
-  const updated =
-    section === "plan"
-      ? updatePlanSection(content, sessionMap)
-      : updateSessionsSection(content, sessionMap);
-  await app.vault.modify(file, updated);
+    const content = await app.vault.read(file);
+    const sessionMap =
+      section === "plan" ? parsePlannedMap(content) : parseSessionMap(content);
+    sessionMap.delete(time);
+    const updated =
+      section === "plan"
+        ? updatePlanSection(content, sessionMap)
+        : updateSessionsSection(content, sessionMap);
+    await app.vault.modify(file, updated);
+  });
 }
 
 async function getOrCreateDailyFile(app: App, date: string): Promise<TFile> {
@@ -137,10 +147,33 @@ async function getOrCreateDailyFile(app: App, date: string): Promise<TFile> {
     return existing;
   }
 
-  const dailyDir = getDailyDirVaultPath(app);
-  const filePath = normalizePath(`${dailyDir}/${date}.md`);
+  const filePath = getDailyFileVaultPath(app, date);
   const initialContent = `${HEADINGS.plan}\n\n${HEADINGS.sessions}\n`;
   return await app.vault.create(filePath, initialContent);
+}
+
+function getDailyFileVaultPath(app: App, date: string): string {
+  const dailyDir = getDailyDirVaultPath(app);
+  return normalizePath(`${dailyDir}/${date}.md`);
+}
+
+async function queueDailyWrite(
+  app: App,
+  date: string,
+  write: () => Promise<void>
+): Promise<void> {
+  const filePath = getDailyFileVaultPath(app, date);
+  const previous = writeQueues.get(filePath) ?? Promise.resolve();
+  const next = previous.then(write, write);
+  writeQueues.set(filePath, next);
+
+  try {
+    await next;
+  } finally {
+    if (writeQueues.get(filePath) === next) {
+      writeQueues.delete(filePath);
+    }
+  }
 }
 
 async function findDailyFile(app: App, date: string): Promise<TFile | null> {

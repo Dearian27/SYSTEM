@@ -38,8 +38,7 @@ function updateSection(
   const section = `${heading}\n${lines.join("\n")}`.trimEnd();
   const escapedHeading = escapeRegex(heading);
   const regex = new RegExp(
-    `(^|\\n)${escapedHeading}(?:\\n[\\s\\S]*?)?(?=\\n## |\\n# |$)`,
-    "m"
+    `(^|\\n)${escapedHeading}(?:\\n[\\s\\S]*?)?(?=\\n## |\\n# |$)`
   );
 
   if (regex.test(content)) {

@@ -19,6 +19,7 @@ export type SystemEngineViewHost = {
   runRebuild(): Promise<void>;
   runLightRefresh(): Promise<void>;
   runSync(): Promise<void>;
+  openHome(): Promise<void>;
   getTicketNames(): Promise<string[]>;
   loadPlanForDate(date: string): Promise<Map<string, string>>;
   loadSessionsForDate(date: string): Promise<Map<string, string>>;
@@ -32,6 +33,7 @@ export class SystemEngineView extends ItemView {
   private readonly plugin: SystemEngineViewHost;
   private selectedDate = todayDateString();
   private currentMode: ViewMode = ViewMode.ACTUAL;
+  private isMutating = false;
 
   constructor(leaf: WorkspaceLeaf, plugin: SystemEngineViewHost) {
     super(leaf);
@@ -90,6 +92,14 @@ export class SystemEngineView extends ItemView {
       statusEl.setText(`Status: ${this.plugin.getStatusText()}`);
     });
 
+    const homeButton = contentEl.createEl("button", {
+      text: "Open Home",
+    });
+    homeButton.style.marginLeft = "8px";
+    homeButton.addEventListener("click", async () => {
+      await this.plugin.openHome();
+    });
+
     const pathEl = contentEl.createEl("p");
     pathEl.setText(`Engine path: ${this.plugin.settings.enginePath}`);
 
@@ -102,12 +112,14 @@ export class SystemEngineView extends ItemView {
     dateRow.style.alignItems = "center";
     const dateInput = dateRow.createEl("input", { type: "date" });
     dateInput.value = this.selectedDate;
+    dateInput.disabled = this.isMutating;
     dateInput.addEventListener("change", async () => {
       this.selectedDate = dateInput.value || todayDateString();
       await this.render();
     });
 
     const modeSelect = dateRow.createEl("select");
+    modeSelect.disabled = this.isMutating;
     for (const mode of Object.values(ViewMode)) {
       const option = modeSelect.createEl("option", {
         text: capitalize(mode),
@@ -154,6 +166,7 @@ export class SystemEngineView extends ItemView {
           label: plannedTicket || "Plan slot",
           filled: Boolean(plannedTicket),
           muted: !plannedTicket,
+          disabled: this.isMutating,
           borderColor:
             actualTicket && plannedTicket === actualTicket
               ? "#2f9e44"
@@ -168,6 +181,7 @@ export class SystemEngineView extends ItemView {
           label: actualTicket || "Actual slot",
           filled: Boolean(actualTicket),
           muted: !actualTicket,
+          disabled: this.isMutating,
           borderColor:
             plannedTicket && plannedTicket !== actualTicket
               ? "#e67700"
@@ -185,6 +199,7 @@ export class SystemEngineView extends ItemView {
             currentTicket || (isPlanMode ? "Add planned work" : "Add session"),
           filled: Boolean(currentTicket),
           muted: !currentTicket,
+          disabled: this.isMutating,
           borderColor:
             plannedTicket && actualTicket && plannedTicket === actualTicket
               ? "#2f9e44"
@@ -203,7 +218,8 @@ export class SystemEngineView extends ItemView {
       });
 
       clearButton.disabled =
-        this.currentMode === "plan" ? !plannedTicket : !actualTicket;
+        this.isMutating ||
+        (this.currentMode === "plan" ? !plannedTicket : !actualTicket);
 
       clearButton.addEventListener("click", async () => {
         await this.handleClear(
@@ -218,47 +234,40 @@ export class SystemEngineView extends ItemView {
     mode: ViewMode.PLAN | ViewMode.ACTUAL,
     time: string
   ): Promise<void> {
+    if (this.isMutating) {
+      return;
+    }
+
     try {
-      console.info("[SYSTEM] Slot clicked", {
-        mode,
-        date: this.selectedDate,
-        time,
-      });
       const ticketNames = await this.plugin.getTicketNames();
-      console.info("[SYSTEM] Ticket names loaded", {
-        mode,
-        count: ticketNames.length,
-      });
       if (ticketNames.length === 0) {
         new Notice("No tickets found for selection.");
         return;
       }
 
       const chosenTicket = await openTicketPicker(this.app, ticketNames);
-      console.info("[SYSTEM] Ticket picker resolved", {
-        mode,
-        chosenTicket,
-        date: this.selectedDate,
-        time,
-      });
       if (!chosenTicket) {
         return;
       }
 
+      this.isMutating = true;
+      await this.render();
+
       if (mode === "plan") {
         await this.plugin.savePlan(this.selectedDate, time, chosenTicket);
-        await this.render();
         new Notice(`Planned ${time} -> ${chosenTicket}`);
         return;
       }
 
       await this.plugin.saveSession(this.selectedDate, time, chosenTicket);
       await this.plugin.runLightRefresh();
-      await this.render();
       new Notice(`Saved ${time} -> ${chosenTicket} and refreshed analytics`);
     } catch (error) {
       console.error(`Failed to save ${mode} entry`, error);
       new Notice(`Failed to save ${mode}: ${getErrorMessage(error)}`, 12000);
+    } finally {
+      this.isMutating = false;
+      await this.render();
     }
   }
 
@@ -266,21 +275,29 @@ export class SystemEngineView extends ItemView {
     mode: "plan" | "actual",
     time: string
   ): Promise<void> {
+    if (this.isMutating) {
+      return;
+    }
+
     try {
+      this.isMutating = true;
+      await this.render();
+
       if (mode === "plan") {
         await this.plugin.clearPlan(this.selectedDate, time);
-        await this.render();
         new Notice(`Cleared planned slot ${time}`);
         return;
       }
 
       await this.plugin.clearSession(this.selectedDate, time);
       await this.plugin.runLightRefresh();
-      await this.render();
       new Notice(`Cleared ${time} and refreshed analytics`);
     } catch (error) {
       console.error(`Failed to clear ${mode} entry`, error);
       new Notice(`Failed to clear ${mode}: ${getErrorMessage(error)}`, 12000);
+    } finally {
+      this.isMutating = false;
+      await this.render();
     }
   }
 }
@@ -311,7 +328,6 @@ async function openTicketPicker(
   app: App,
   tickets: string[]
 ): Promise<string | null> {
-  console.info("[SYSTEM] Opening ticket picker", { count: tickets.length });
   return await new Promise((resolve) => {
     const modal = new TicketSuggestModal(app, tickets, resolve);
     modal.open();
@@ -344,7 +360,6 @@ class TicketSuggestModal extends FuzzySuggestModal<string> {
   }
 
   onChooseItem(item: string): void {
-    console.info("[SYSTEM] Ticket chosen", { item });
     this.didChoose = true;
     if (!this.didResolve) {
       this.didResolve = true;
@@ -354,9 +369,6 @@ class TicketSuggestModal extends FuzzySuggestModal<string> {
 
   onClose(): void {
     super.onClose();
-    console.info("[SYSTEM] Ticket picker closed", {
-      didChoose: this.didChoose,
-    });
     window.setTimeout(() => {
       if (!this.didChoose && !this.didResolve) {
         this.didResolve = true;
@@ -383,13 +395,15 @@ function renderSlotButton(params: {
   label: string;
   filled: boolean;
   muted: boolean;
+  disabled: boolean;
   borderColor: string;
   onClick: () => Promise<void>;
 }): void {
-  const { row, label, filled, muted, borderColor, onClick } = params;
+  const { row, label, filled, muted, disabled, borderColor, onClick } = params;
   const button = row.createEl("button", {
     text: label,
   });
+  button.disabled = disabled;
   button.style.textAlign = "left";
   button.style.justifyContent = "flex-start";
   button.style.border = `1px solid ${borderColor}`;

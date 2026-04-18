@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "habits": [
+    {
+      "id": "read-book-mo3gzv8e",
+      "name": "Read book",
+      "requiredCompletion": 0.8,
+      "schedule": {
+        "type": "daily"
+      },
+      "completions": {},
+      "createdAt": "2026-04-17T22:18:51.998Z"
+    }
+  ]
+}
