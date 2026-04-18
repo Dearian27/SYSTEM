@@ -2,9 +2,16 @@ import { ViewMode } from "@/types/daily";
 
 export const getHintText = (viewMode: ViewMode) =>
   ({
-    [ViewMode.PLAN]: "Plan mode edits ## Plan only.",
-    [ViewMode.ACTUAL]: "Actual mode edits ## Sessions and refreshes analytics.",
-    [ViewMode.COMPARE]: "Compare mode shows plan vs actual for each slot.",
+    [ViewMode.PLAN]: "Planning what you want to spend time on.",
+    [ViewMode.ACTUAL]: "Logging what actually happened.",
+    [ViewMode.COMPARE]: "Comparing your plan with the real day.",
+  }[viewMode]);
+
+export const getViewTitle = (viewMode: ViewMode) =>
+  ({
+    [ViewMode.PLAN]: "Plan",
+    [ViewMode.ACTUAL]: "Actual",
+    [ViewMode.COMPARE]: "Plan vs Actual",
   }[viewMode]);
 
 export const getClearButtonText = (viewMode: ViewMode) =>

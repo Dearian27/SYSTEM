@@ -1,4 +1,8 @@
-import { getClearButtonText, getHintText } from "@/constants/engine-view";
+import {
+  getClearButtonText,
+  getHintText,
+  getViewTitle,
+} from "@/constants/engine-view";
 import { ViewMode } from "@/types/daily";
 import {
   App,
@@ -32,6 +36,7 @@ export type SystemEngineViewHost = {
 export class SystemEngineView extends ItemView {
   private readonly plugin: SystemEngineViewHost;
   private selectedDate = todayDateString();
+  private draftDate = this.selectedDate;
   private currentMode: ViewMode = ViewMode.ACTUAL;
   private isMutating = false;
 
@@ -104,18 +109,37 @@ export class SystemEngineView extends ItemView {
     pathEl.setText(`Engine path: ${this.plugin.settings.enginePath}`);
 
     contentEl.createEl("hr");
-    contentEl.createEl("h3", { text: "Daily Planning" });
+    contentEl.createEl("h3", { text: getViewTitle(this.currentMode) });
+    const dateLabel = contentEl.createEl("p", {
+      text: formatFriendlyDate(this.selectedDate),
+    });
+    dateLabel.style.opacity = "0.82";
+    dateLabel.style.marginTop = "-4px";
 
     const dateRow = contentEl.createDiv();
     dateRow.style.display = "flex";
     dateRow.style.gap = "8px";
     dateRow.style.alignItems = "center";
     const dateInput = dateRow.createEl("input", { type: "date" });
-    dateInput.value = this.selectedDate;
+    dateInput.value = this.draftDate;
     dateInput.disabled = this.isMutating;
-    dateInput.addEventListener("change", async () => {
-      this.selectedDate = dateInput.value || todayDateString();
-      await this.render();
+    dateInput.addEventListener("input", () => {
+      this.draftDate = dateInput.value;
+    });
+    dateInput.addEventListener("keydown", async (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        await this.applyDateInput(dateInput);
+      }
+    });
+    dateInput.addEventListener("blur", () => {
+      this.draftDate = dateInput.value || this.selectedDate;
+    });
+
+    const applyDateButton = dateRow.createEl("button", { text: "Go" });
+    applyDateButton.disabled = this.isMutating;
+    applyDateButton.addEventListener("click", async () => {
+      await this.applyDateInput(dateInput);
     });
 
     const modeSelect = dateRow.createEl("select");
@@ -135,8 +159,7 @@ export class SystemEngineView extends ItemView {
     const hintEl = contentEl.createEl("p");
     hintEl.style.opacity = "0.75";
     hintEl.style.marginTop = "8px";
-    const hintContent = getHintText(this.currentMode);
-    hintEl.setText(hintContent);
+    hintEl.setText(getHintText(this.currentMode));
 
     const plan = await this.plugin.loadPlanForDate(this.selectedDate);
     const sessions = await this.plugin.loadSessionsForDate(this.selectedDate);
@@ -300,6 +323,26 @@ export class SystemEngineView extends ItemView {
       await this.render();
     }
   }
+
+  private async commitSelectedDate(date: string): Promise<void> {
+    if (date === this.selectedDate) {
+      return;
+    }
+
+    this.selectedDate = date;
+    this.draftDate = date;
+    await this.render();
+  }
+
+  private async applyDateInput(dateInput: HTMLInputElement): Promise<void> {
+    if (!isCompleteDate(dateInput.value)) {
+      this.draftDate = this.selectedDate;
+      dateInput.value = this.selectedDate;
+      return;
+    }
+
+    await this.commitSelectedDate(dateInput.value);
+  }
 }
 
 function buildTimeSlots(): string[] {
@@ -322,6 +365,20 @@ function buildTimeSlots(): string[] {
 
 function todayDateString(): string {
   return new Date().toISOString().slice(0, 10);
+}
+
+function isCompleteDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function formatFriendlyDate(date: string): string {
+  return new Intl.DateTimeFormat("en", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  }).format(new Date(`${date}T00:00:00.000Z`));
 }
 
 async function openTicketPicker(

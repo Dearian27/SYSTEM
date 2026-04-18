@@ -130,4 +130,56 @@ describe("SystemEngineView", () => {
 
     expect(host.openHome).toHaveBeenCalledTimes(1);
   });
+
+  it("does not reload the sidebar while a date is typed", async () => {
+    const host = createHost();
+    const { contentEl, view } = createView(host);
+    await view.onOpen();
+
+    expect(contentEl.textContent).toContain("Actual");
+    expect(contentEl.textContent).toMatch(
+      /(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),/
+    );
+    expect(host.loadPlanForDate).toHaveBeenCalledTimes(1);
+    expect(host.loadSessionsForDate).toHaveBeenCalledTimes(1);
+
+    const dateInput = contentEl.querySelector<HTMLInputElement>(
+      "input[type='date']"
+    );
+    expect(dateInput).toBeTruthy();
+
+    dateInput!.value = "2026-04-10";
+    dateInput!.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushPromises();
+
+    expect(host.loadPlanForDate).toHaveBeenCalledTimes(1);
+    expect(host.loadSessionsForDate).toHaveBeenCalledTimes(1);
+  });
+
+  it("reloads the sidebar after the typed date is applied", async () => {
+    const host = createHost();
+    const { contentEl, view } = createView(host);
+    await view.onOpen();
+
+    const dateInput = contentEl.querySelector<HTMLInputElement>(
+      "input[type='date']"
+    );
+    expect(dateInput).toBeTruthy();
+
+    dateInput!.value = "2026-04-10";
+    dateInput!.dispatchEvent(new Event("input", { bubbles: true }));
+    await flushPromises();
+
+    const goButton = Array.from(contentEl.querySelectorAll("button")).find(
+      (button) => button.textContent === "Go"
+    );
+    expect(goButton).toBeTruthy();
+    goButton!.click();
+    await flushPromises();
+
+    await vi.waitFor(() => {
+      expect(host.loadPlanForDate).toHaveBeenLastCalledWith("2026-04-10");
+      expect(host.loadSessionsForDate).toHaveBeenLastCalledWith("2026-04-10");
+    });
+  });
 });
