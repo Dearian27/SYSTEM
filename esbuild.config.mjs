@@ -4,8 +4,10 @@ import { builtinModules } from "node:module";
 import path from "node:path";
 
 const prod = process.argv[2] === "production";
+const defaultPluginDir =
+  "/Users/dfedy/Library/Mobile Documents/iCloud~md~obsidian/Documents/vault/.obsidian/plugins/system-engine";
 const pluginDir = path.resolve(
-  "../../.obsidian/plugins/system-engine"
+  process.env.OBSIDIAN_PLUGIN_DIR?.trim() || defaultPluginDir
 );
 
 const copyStaticFilesPlugin = {

@@ -1,5 +1,8 @@
 import path from "node:path";
 
+const DEFAULT_ENGINE_ROOT =
+  process.env.SYSTEM_ENGINE_ROOT?.trim() || process.cwd();
+
 function buildPaths(engineRoot: string) {
   return {
     dashboardDir: path.resolve(engineRoot, "../Dashboard"),
@@ -27,7 +30,7 @@ function buildPaths(engineRoot: string) {
   };
 }
 
-export let PATHS = buildPaths(process.cwd());
+export let PATHS = buildPaths(DEFAULT_ENGINE_ROOT);
 
 export function setEngineRoot(engineRoot: string): void {
   PATHS = buildPaths(engineRoot);
